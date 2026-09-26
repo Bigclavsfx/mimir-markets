@@ -33,7 +33,7 @@ import type { AgentApiAction } from "./api";
  * must be initiated by the owner, not by whatever credential is being replaced.
  */
 export const OWNER_SIGNED_ACTIONS: readonly AgentApiAction[] = [
-  "register", "revoke", "revokeKey", "grantSpend", "revokeSpend",
+  "register", "revoke", "issueKey", "revokeKey", "rotateKey", "grantSpend", "revokeSpend",
 ];
 
 export function requiresOwnerSignature(action: AgentApiAction): boolean {
@@ -94,7 +94,7 @@ export async function authenticateAgentRequest(args: {
     return { error: apiError("forbidden", "key does not belong to this agent") };
   }
 
-  if (checked.record.scopes && checked.record.scopes.length > 0 && !checked.record.scopes.includes(args.action)) {
+  if (checked.record.scopes && !checked.record.scopes.includes(args.action)) {
     return { error: apiError("forbidden", `API key is not scoped for action: ${args.action}`) };
   }
 
