@@ -7,7 +7,7 @@ use crate::events;
 use crate::storage;
 use crate::types::{
     ClaimResult, Error, Market, BPS_DIVISOR, MAX_DURATION, MAX_FEE_BPS, MAX_PARTICIPANTS_PER_SIDE,
-    MIN_DURATION, RESULT_CANCELLED, SIDE_A, SIDE_B,
+    MAX_QUESTION_BYTES, MIN_DURATION, RESULT_CANCELLED, SIDE_A, SIDE_B,
 };
 
 /// The fee on one winning claim: `floor(profit * fee_bps / BPS_DIVISOR)`.
@@ -89,6 +89,9 @@ pub fn create_market(
 
     if question.is_empty() {
         return Err(Error::EmptyQuestion);
+    }
+    if question.len() > MAX_QUESTION_BYTES {
+        return Err(Error::QuestionTooLong);
     }
     let now = env.ledger().timestamp();
     let earliest = now.checked_add(MIN_DURATION).ok_or(Error::Overflow)?;
@@ -277,7 +280,14 @@ pub fn resolve(env: &Env, market_id: u64, result: u32) -> Result<(), Error> {
     storage::oracle(env)?.require_auth();
 
     let mut market = storage::get_market(env, market_id)?;
-    if market.resolved || env.ledger().timestamp() < market.deadline {
+    if market.resolved {
+        if market.result == result {
+            return Ok(());
+        } else {
+            return Err(Error::NotResolvable);
+        }
+    }
+    if env.ledger().timestamp() < market.deadline {
         return Err(Error::NotResolvable);
     }
     if result != SIDE_A && result != SIDE_B && result != RESULT_CANCELLED {

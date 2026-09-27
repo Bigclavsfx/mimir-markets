@@ -24,6 +24,10 @@ pub fn create_claim(env: &Env, creator: Address, params: CreateParams) -> Result
     if params.question.is_empty() {
         return Err(Error::EmptyQuestion);
     }
+    // Bound the metadata this claim will commit to persistent storage BEFORE
+    // any money moves: an over-long claim is refused with nothing escrowed and
+    // no claim id consumed, so a rejected caller can retry with less text.
+    util::validate_create_metadata(env, &params)?;
 
     let usdc = storage::usdc(env)?;
     escrow::pull(env, &usdc, &creator, params.stake_amount)?;
@@ -296,6 +300,9 @@ pub fn transition_deadline(env: &Env, claim_id: u64) -> Result<(), Error> {
 pub fn cancel_claim(env: &Env, claim_id: u64) -> Result<(), Error> {
     let mut claim = storage::get_claim(env, claim_id)?;
     claim.creator.require_auth();
+    if claim.state == ClaimState::Cancelled {
+        return Ok(());
+    }
     if claim.state != ClaimState::Open {
         return Err(Error::ClaimNotOpen);
     }
